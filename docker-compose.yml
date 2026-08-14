@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: trip
+      POSTGRES_PASSWORD: trip
+      POSTGRES_DB: trip_concierge
+    ports:
+      - "5432:5432"
+    volumes:
+      - trip-postgres:/var/lib/postgresql/data
+
+volumes:
+  trip-postgres:
