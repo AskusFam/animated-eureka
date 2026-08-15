@@ -1,11 +1,9 @@
 :root {
-  --ink: #16211d;
-  --muted: #64706a;
-  --paper: #f7f5ef;
-  --card: #fffdf8;
-  --line: #dfe5dc;
-  --accent: #2f6f58;
-  --accent-soft: #e4f0e7;
+  --ink: #171717;
+  --muted: #737373;
+  --paper: #f6f6f2;
+  --line: #deded8;
+  --accent: #171717;
 }
 
 * { box-sizing: border-box; }
@@ -24,10 +22,20 @@ p { color: var(--muted); font-size: 17px; line-height: 1.6; }
 .form { max-width: 520px; display: grid; gap: 14px; }
 .form label { display: grid; gap: 7px; color: var(--muted); font-size: 14px; font-weight: 700; }
 .form input { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 12px; font: inherit; background: white; }
-.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 56px; }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 22px; }
-.card h3 { margin: 0 0 10px; }
-.card p { margin: 0; font-size: 15px; }
-.status { display: inline-flex; gap: 8px; align-items: center; background: var(--accent-soft); border-radius: 999px; padding: 8px 12px; color: var(--accent); font-size: 13px; font-weight: 700; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
-@media (max-width: 700px) { .grid { grid-template-columns: 1fr; } .nav { margin-bottom: 48px; } }
+.rally-home { max-width: 1180px; min-height: 100vh; margin: 0 auto; padding: 28px 32px 54px; }
+.rally-nav { display: flex; justify-content: space-between; align-items: center; }
+.rally-brand { font-size: 25px; font-weight: 800; letter-spacing: -.07em; }
+.nav-link { color: var(--muted); font-size: 14px; }
+.rally-hero { max-width: 680px; padding: 18vh 0 20vh; }
+.rally-kicker { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+.rally-hero h1 { font-size: clamp(52px, 9vw, 112px); line-height: .9; letter-spacing: -.085em; margin: 0 0 32px; }
+.rally-hero p { max-width: 440px; color: var(--muted); font-size: 18px; line-height: 1.45; margin: 0 0 28px; }
+.text-button { display: inline-flex; gap: 16px; align-items: center; border-bottom: 1px solid var(--ink); padding-bottom: 7px; font-weight: 700; }
+.text-button span { font-size: 20px; line-height: 12px; }
+.setup-note { display: block; color: var(--muted); margin-top: 18px; font-size: 12px; }
+.rally-proof { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; border-top: 1px solid var(--line); padding-top: 22px; }
+.rally-proof div { display: grid; gap: 9px; }
+.rally-proof span { color: var(--muted); font-size: 12px; }
+.rally-proof strong { font-size: 16px; }
+.rally-proof p { color: var(--muted); font-size: 14px; line-height: 1.45; margin: 0; max-width: 230px; }
+@media (max-width: 700px) { .rally-home { padding: 24px 20px 42px; } .rally-hero { padding: 22vh 0 18vh; } .rally-proof { grid-template-columns: 1fr; gap: 22px; } }
