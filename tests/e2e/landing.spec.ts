@@ -2,9 +2,9 @@ import { expect, test } from "@playwright/test";
 
 test("landing page explains the concierge", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /your group trip/i })).toBeVisible();
-  await expect(page.getByText("Text first")).toBeVisible();
-  await expect(page.getByRole("link", { name: /open prototype dashboard/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /text rally/i })).toBeVisible();
+  await expect(page.getByText("Rally keeps it moving.")).toBeVisible();
+  await expect(page.getByRole("link", { name: /text rally/i })).toHaveAttribute("href", "sms:");
 });
 
 test("organizer can create a trip from the dashboard", async ({ page }) => {
