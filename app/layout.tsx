@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Trip Concierge",
+  title: "Rally — group trips, handled by text",
   description: "A text-first concierge for planning trips with your group.",
 };
 
