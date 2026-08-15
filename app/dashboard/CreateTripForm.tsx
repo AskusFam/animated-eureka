@@ -10,7 +10,8 @@ export function CreateTripForm() {
     event.preventDefault();
     setBusy(true);
     setMessage("");
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const response = await fetch("/api/trips", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -19,7 +20,7 @@ export function CreateTripForm() {
     const result = await response.json();
     setBusy(false);
     setMessage(response.ok ? `Trip created: ${result.name}` : result.error);
-    if (response.ok) event.currentTarget.reset();
+    if (response.ok) formElement.reset();
   }
 
   return (
