@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-const conciergeNumber = process.env.NEXT_PUBLIC_CONCIERGE_NUMBER;
+const conciergeNumber = process.env.NEXT_PUBLIC_CONCIERGE_NUMBER ?? "+19784508846";
 const smsHref = conciergeNumber
   ? `sms:${conciergeNumber}?body=${encodeURIComponent("RALLY WEB PLAN")}`
   : "sms:";
