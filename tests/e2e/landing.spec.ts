@@ -4,7 +4,7 @@ test("landing page explains the concierge", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /make plans.*keep friends/i })).toBeVisible();
   await expect(page.getByText("From “we should”")).toBeVisible();
-  await expect(page.getByRole("link", { name: /text rally/i }).first()).toHaveAttribute("href", "sms:");
+  await expect(page.getByRole("link", { name: /text rally/i }).first()).toHaveAttribute("href", "sms:+19784508846?body=RALLY%20WEB%20PLAN");
 });
 
 test("organizer can create a trip from the dashboard", async ({ page }) => {
