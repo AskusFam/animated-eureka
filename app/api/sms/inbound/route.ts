@@ -47,7 +47,14 @@ export async function POST(request: Request) {
       providerMessageId: providerMessageId || undefined,
     });
   }
-  await messagingProvider.sendSms({ to: from, body: reply });
+  try {
+    await messagingProvider.sendSms({ to: from, body: reply });
+  } catch (error) {
+    console.error("Outbound SMS failed", {
+      to: from,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   return new NextResponse("<Response></Response>", {
     status: 200,
