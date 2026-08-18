@@ -11,6 +11,11 @@ export interface MessagingProvider {
 
 class TwilioMessagingProvider implements MessagingProvider {
   async sendSms({ to, body }: SendSmsInput) {
+    if (process.env.MESSAGING_PROVIDER !== "twilio") {
+      console.info("Messaging preview", { provider: process.env.MESSAGING_PROVIDER ?? "preview", to, body });
+      return {};
+    }
+
     if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_FROM_NUMBER) {
       console.info("SMS preview", { to, body });
       return {};

@@ -96,7 +96,9 @@ export async function POST(request: Request) {
 
   let participant: { id: string; tripId: string } | undefined;
   const sendAndRecord = async (bodyToSend: string, kind: "progress_ack" | "final_reply") => {
-    const result = await sendblueMessage({ to: from, body: bodyToSend });
+    const result = process.env.MESSAGING_PROVIDER === "sendblue"
+      ? await sendblueMessage({ to: from, body: bodyToSend })
+      : (console.info("Sendblue messaging preview", { provider: process.env.MESSAGING_PROVIDER ?? "preview", to: from, body: bodyToSend }), {});
     if (db) await db.insert(messages).values({
       tripId: participant?.tripId,
       participantId: participant?.id,
