@@ -2,7 +2,7 @@
 
 Status: Phase 3 implementation — Agentic concierge MVP
 
-Last updated: 2026-08-17
+Last updated: 2026-08-18
 
 This is the living product, architecture, and validation document for a text-first trip-planning concierge.
 
@@ -339,11 +339,124 @@ Next implementation slice:
 - Add review pages with approve, revise, and ask-the-group actions.
 - Add reminder jobs tied to outstanding agent actions and local quiet hours.
 
-## 10. Open decisions
+## 13. In-message carousel voting and asset cache
+
+The group decision experience is message-native. Participants should not be sent to a voting webpage and should not have to type a vote.
+
+### 13.1 Interaction pattern
+
+When Rally has enough of a trip brief to make useful suggestions, it sends:
+
+1. One Sendblue carousel containing three visual directions.
+2. One individual image message per option, with a short title and explanation.
+3. A prompt such as: “Heart the one you’d pick.”
+
+The carousel is the browse step. The individual messages are the voting step because a Tapback can be associated with a specific message, while it cannot be reliably associated with one slide inside a multi-image carousel.
+
+```mermaid
+flowchart TD
+    A[Agent has destination and timing] --> B{Asset cache lookup}
+    B -->|Hit| C[Reuse stable HTTPS image URLs]
+    B -->|Miss| D[Generate or select images and persist assets]
+    C --> E[Send Sendblue carousel]
+    D --> E
+    E --> F[Send three individual option cards]
+    F --> G[Participant hearts a card]
+    G --> H[Match reaction to provider message handle]
+    H --> I[Aggregate group preferences]
+    I --> J[Update planner and choose next action]
+```
+
+The current implementation sends the carousel followed by three individual cards. In preview mode it logs the planned delivery without contacting anyone. In Sendblue mode it records every outbound provider handle so the reaction can be mapped back to a trip option.
+
+Sendblue requires carousel image URLs to be HTTPS and supports 2–20 images per carousel. The implementation validates those constraints before sending. See the [Sendblue carousel API](https://docs.sendblue.com/api-v2/carousel/).
+
+### 13.2 Reaction handling
+
+The webhook parser accepts a reaction payload when it includes a reaction type and a message handle. If that handle maps to an individual option card, Rally records the reaction against the participant and option. The parser is intentionally isolated because the public Sendblue documentation describes sending reactions but does not define a stable inbound Tapback webhook contract.
+
+Until inbound Tapbacks are confirmed in the connected Sendblue account, the product should keep a contingency available: a one-tap web link or a short `01`, `02`, or `03` reply. That fallback is not the primary experience.
+
+### 13.3 Asset caching
+
+Rally does not regenerate an image every time an option is sent. Each asset receives a stable cache key:
+
+```text
+trip-option:{destination}:{option-direction}:{asset-version}
+```
+
+The database stores the cache key, HTTPS URL, source, and asset type. The bytes can live in Vercel Blob during the prototype and move to Azure Blob Storage later without changing the message or option model.
+
+Generated images should be versioned. If the prompt or visual style changes, increment the asset version instead of overwriting an image that an existing trip may still reference.
+
+## 14. Carousel data model
+
+```mermaid
+erDiagram
+    trips ||--o{ trip_options : proposes
+    trip_options ||--o{ trip_option_assets : uses
+    media_assets ||--o{ trip_option_assets : caches
+    messages ||--o{ message_option_map : identifies
+    trip_options ||--o{ message_option_map : maps
+    participants ||--o{ message_option_map : receives
+    trip_options ||--o{ option_reactions : receives
+    participants ||--o{ option_reactions : sends
+
+    trips {
+      uuid id PK
+      text destination
+      text status
+    }
+    trip_options {
+      uuid id PK
+      uuid trip_id FK
+      text code
+      text title
+      text summary
+    }
+    media_assets {
+      uuid id PK
+      text cache_key UK
+      text url
+      text source
+    }
+    messages {
+      uuid id PK
+      text provider_message_id UK
+      text direction
+    }
+    message_option_map {
+      uuid message_id FK
+      uuid trip_option_id FK
+      text provider_message_handle UK
+    }
+    option_reactions {
+      uuid trip_option_id FK
+      uuid participant_id FK
+      text provider_message_handle
+      text reaction_type
+    }
+```
+
+The existing `messages` table remains the delivery ledger. `message_option_map` adds the identity needed to connect an individual option card to a Tapback. `option_reactions` is append-only for the prototype so changes and duplicate provider events can be audited.
+
+## 15. Next implementation slices
+
+The current staged slice covers the option drafts, cache metadata, carousel provider, individual card delivery, message-handle mapping, reaction parsing, migration, and unit tests.
+
+Next:
+
+1. Confirm the exact inbound Tapback payload with Sendblue and add a signed webhook fixture.
+2. Replace curated fallback images with the selected image-generation provider and Vercel Blob/Azure Blob storage.
+3. Fan out the same option set to opted-in participants, keeping each participant’s reactions private until aggregation.
+4. Add a group pulse view: leading option, participation rate, unresolved conflicts, and next reminder.
+5. Add organizer controls to extend voting, proceed with the current leader, or ask Rally for a new round.
+
+## 16. Open decisions
 
 The following recommendations are the current working decisions. They should be validated during Phase 1 rather than treated as permanent commitments.
 
-### 10.1 Product name in SMS messages
+### 16.1 Product name in SMS messages
 
 Recommendation: use a clear temporary name such as “Trip Concierge” until user research produces a stronger brand. Every first message should identify the service and explain why the recipient is receiving the text.
 
@@ -353,7 +466,7 @@ Example:
 
 Rationale: clarity and trust matter more than brand polish during the prototype. Avoid presenting the service as a person or implying that a human is responding when the message is automated.
 
-### 10.2 First target segment
+### 16.2 First target segment
 
 Recommendation: start with friend groups planning domestic or international leisure trips, especially groups of 4–8 adults where one person normally coordinates the trip.
 
@@ -367,7 +480,7 @@ Rationale:
 
 Families and work groups should remain secondary research segments, not equal MVP targets. For the first pilot, use a mix of domestic and international trips only if the messaging provider can reliably reach the participants.
 
-### 10.3 Final approval authority
+### 16.3 Final approval authority
 
 Recommendation: the organizer has final approval authority for the trip plan, but participants retain control over their own consent, private information, and participation.
 
@@ -380,7 +493,7 @@ The organizer can approve the itinerary, but cannot:
 
 Rationale: one accountable decision-maker keeps the workflow from stalling, while participant autonomy prevents trust and privacy problems.
 
-### 10.4 What participants see
+### 16.4 What participants see
 
 Recommendation: participants see their own private conversation and a shared, anonymized group summary. They should not see named private responses by default.
 
@@ -392,7 +505,7 @@ Named attribution should require explicit permission. The organizer can receive 
 
 Rationale: anonymous summaries support honest input while still making tradeoffs visible.
 
-### 10.5 Human review during the prototype
+### 16.5 Human review during the prototype
 
 Recommendation: use human-in-the-loop review for every itinerary before it is sent as a final recommendation during Phase 1.
 
@@ -409,7 +522,7 @@ The operator should not silently alter private preferences or make undisclosed d
 
 Rationale: the first objective is to learn the workflow and protect pilot users, not to prove full autonomy.
 
-### 10.6 Onboarding channel
+### 16.6 Onboarding channel
 
 Recommendation: use SMS for the initial invite and short preference questions, with a secure web page for the longer intake and itinerary review.
 
@@ -423,7 +536,7 @@ The first SMS flow should ask only enough questions to establish engagement. A w
 
 Rationale: SMS is the low-friction entry point, while the web is better for structured and sensitive information.
 
-### 10.7 Travel data sources for the pilot
+### 16.7 Travel data sources for the pilot
 
 Recommendation: begin with a small, curated set of sources and human verification rather than attempting universal travel coverage.
 
@@ -436,7 +549,7 @@ The pilot should use:
 
 The system should label each item as an idea, researched recommendation, checked option, or confirmed booking. No item should be represented as booked unless a user completes the booking independently or a future booking integration confirms it.
 
-### 10.8 Nonresponsive participants and reminders
+### 16.8 Nonresponsive participants and reminders
 
 Recommendation: use persistent, configurable reminders with a clear stopping point and participant controls.
 
@@ -451,7 +564,7 @@ Suggested policy:
 
 Participants can select standard, persistent, or minimal reminders; pause reminders; set quiet hours; or leave the trip. The organizer can proceed without a participant, extend the deadline, or remove the participant from a decision. The system must never send unlimited reminders or continue after an opt-out.
 
-### 10.9 Shared group-chat timing
+### 16.9 Shared group-chat timing
 
 Recommendation: reserve a full shared group-chat implementation for after the private-mode pilot, but test the concept manually during Phase 1 with one or two groups.
 
@@ -464,7 +577,7 @@ The manual test can use a controlled shared thread for:
 
 Rationale: private mode is the safer foundation for consent and preference collection. A small manual test will show whether the group-chat experience adds value before we build its routing and privacy model.
 
-### 10.10 Recommended Phase 0 decision set
+### 16.10 Recommended Phase 0 decision set
 
 For planning purposes, Phase 0 should close with these decisions:
 
@@ -479,7 +592,7 @@ For planning purposes, Phase 0 should close with these decisions:
 - Reminders: persistent, configurable, local-time-aware, quiet-hour-aware, and stopped after completion, pause, leave, or opt-out.
 - MVP number: platform-owned US toll-free number, subject to provider verification.
 
-## 11. Current decisions log
+## 17. Current decisions log
 
 | Date | Decision | Rationale |
 |---|---|---|
@@ -492,9 +605,9 @@ For planning purposes, Phase 0 should close with these decisions:
 | 2026-08-14 | Make reminders a core product capability | Persistent, well-timed reminders can directly reduce the organizer’s coordination workload |
 | 2026-08-14 | Start with a US toll-free number for the prototype | Neutral US identity and appropriate two-way business messaging path; international reach requires provider and country validation |
 
-## 12. Prototype technical stack
+## 18. Prototype technical stack
 
-### 12.1 Recommendation
+### 18.1 Recommendation
 
 Use a TypeScript modular monolith with a separate background worker. Package both processes as Docker containers so the same images can run locally, in a simple prototype host, or on Azure Container Apps.
 
@@ -515,7 +628,7 @@ Background worker
         +--> post-trip follow-ups
 ```
 
-### 12.2 Components
+### 18.2 Components
 
 | Concern | Prototype choice | Azure path later |
 |---|---|---|
@@ -532,7 +645,7 @@ Background worker
 | Observability | Structured JSON logs, request IDs, and OpenTelemetry instrumentation | Azure Monitor and Application Insights |
 | Local development | Docker Compose with PostgreSQL and the app/worker | Same containers deployed through Azure tooling |
 
-### 12.3 Architectural boundaries to establish immediately
+### 18.3 Architectural boundaries to establish immediately
 
 - `MessagingProvider`: send SMS, parse inbound messages, retrieve delivery status, and handle provider-specific behavior.
 - `LLMProvider`: classify intent, extract structured data, draft messages, summarize groups, and generate itinerary candidates.
@@ -543,7 +656,7 @@ Background worker
 
 These interfaces are more important than prematurely splitting the application into microservices. The first implementation should keep modules in one repository and one deployable web application plus one worker.
 
-### 12.4 Initial data model
+### 18.4 Initial data model
 
 Start with relational tables for:
 
@@ -558,7 +671,7 @@ Start with relational tables for:
 - Learned preferences and feedback.
 - Source records and retrieval timestamps.
 
-## 13. Phase 1 implementation plan — useful end to end
+## 19. Phase 1 implementation plan — useful end to end
 
 Phase 1 should prove one complete loop with a real organizer and a small group:
 
@@ -577,7 +690,7 @@ Organizer texts Rally
     -> Reminder service moves the group through the next actions
 ```
 
-### 13.1 Build order
+### 19.1 Build order
 
 1. Replace the current keyword reply with a persisted conversation state machine: `new`, `collecting_trip_brief`, `inviting_participants`, `collecting_preferences`, `researching`, `awaiting_feedback`, `approved`, and `completed`.
 2. Make `RALLY WEB PLAN` create or resume a trip for the sender and ask the first useful question.
@@ -590,7 +703,7 @@ Organizer texts Rally
 9. Add the shared itinerary page as the source of truth, then add reminders tied to incomplete actions.
 10. Add an operator review queue before a proposal is marked final.
 
-### 13.2 AI and research boundary
+### 19.2 AI and research boundary
 
 The AI should ask, interpret, summarize, and draft. It should not be the system of record. Deterministic application code owns consent, identity, permissions, state transitions, voting, reminder suppression, and confirmed itinerary data.
 
@@ -608,13 +721,13 @@ Trip requirements
 
 Every researched recommendation must retain its source URL, retrieval time, destination, price context, and uncertainty. International travel information must link to authoritative government or provider sources and be presented as information to verify, not legal or immigration advice.
 
-### 13.3 Model integration decision
+### 19.3 Model integration decision
 
 Use an `LLMProvider` interface so Rally can call an API model from the backend without coupling product logic to one vendor. The first implementation uses Gemini’s Interactions API from the backend, requesting a strict JSON shape for intent and field extraction, with deterministic validation after every model call. The integration uses the REST endpoint so the current Node 18 deployment does not need a runtime upgrade.
 
 The model provider is intentionally replaceable. Gemini credentials belong in `GEMINI_API_KEY` as a server-only environment variable, and the model is selected with `GEMINI_MODEL`. This does not prevent using other models later for operator review or specialized research tasks.
 
-### 13.4 Carousel concept
+### 19.4 Carousel concept
 
 Carousels should be used as a decision surface, not as the primary conversation. After research, Rally can send a short text followed by a visual comparison:
 
@@ -630,7 +743,7 @@ The image should be a destination or neighborhood image; the message text remain
 
 Sendblue carousels require a V2 line and 2–20 HTTPS image URLs, so the current free shared line should use ordinary text plus single-image links until a V2 line is available. [Sendblue carousel requirements](https://docs.sendblue.com/api-v2/carousel)
 
-### 13.5 Phase 1 definition of done
+### 19.5 Phase 1 definition of done
 
 - An organizer can create a trip and receive a meaningful next question.
 - At least two participants can join privately and complete the core preference flow.
@@ -644,7 +757,7 @@ Sendblue carousels require a V2 line and 2–20 HTTPS image URLs, so the current
 
 Use explicit status fields and an append-only message/event history. Do not rely on the latest LLM conversation transcript as the authoritative trip state.
 
-### 12.5 Deployment strategy
+### 18.5 Deployment strategy
 
 For the prototype:
 
@@ -656,7 +769,7 @@ For the prototype:
 
 Azure Container Apps is a good target because it supports HTTP applications, background processing, scheduled or event-driven jobs, autoscaling, revisions, and scale-to-zero behavior. Azure Database for PostgreSQL Flexible Server preserves the open-source PostgreSQL engine and supports managed backups, scaling, and connection pooling. Azure Service Bus provides durable queues, publish/subscribe topics, retries, and dead-letter handling for later reliable processing.
 
-### 12.6 Deliberate non-choices
+### 18.6 Deliberate non-choices
 
 - Do not start with microservices.
 - Do not start with Kubernetes or AKS.
