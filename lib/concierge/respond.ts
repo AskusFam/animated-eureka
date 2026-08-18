@@ -17,5 +17,9 @@ export function buildConciergeReply(body: string) {
     return "Great. Where would you like to go, and roughly when? You can reply with a destination and date range in one message.";
   }
 
+  if (["new", "new trip", "restart", "reset", "start over", "plan another trip"].includes(normalized)) {
+    return "Fresh start. Where are you thinking of going, and when?";
+  }
+
   return "I’m ready to help plan. Tell me the destination, dates, and how many people are going. Reply HELP for help or STOP to unsubscribe.";
 }

@@ -1,10 +1,12 @@
 import {
   boolean,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -50,10 +52,27 @@ export const messages = pgTable("messages", {
   id: uuid("id").defaultRandom().primaryKey(),
   tripId: uuid("trip_id").references(() => trips.id),
   participantId: uuid("participant_id").references(() => participants.id),
+  senderPhone: text("sender_phone"),
+  source: text("source"),
+  campaignCode: text("campaign_code"),
   direction: messageDirection("direction").notNull(),
   body: text("body").notNull(),
   providerMessageId: text("provider_message_id"),
+  traceId: text("trace_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  providerMessageIdUnique: uniqueIndex("messages_provider_message_id_unique").on(table.providerMessageId),
+}));
+
+export const conversationSessions = pgTable("conversation_sessions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  phoneNumber: text("phone_number").notNull().unique(),
+  tripId: uuid("trip_id").references(() => trips.id),
+  participantId: uuid("participant_id").references(() => participants.id),
+  state: text("state").notNull().default("new"),
+  intake: jsonb("intake").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const reminders = pgTable("reminders", {

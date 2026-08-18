@@ -20,3 +20,7 @@ export async function inviteParticipant(input: InviteParticipantInput) {
   await tripRepository.scheduleReminder(reminder, input.tripId);
   return { participant, reminder };
 }
+
+export async function getTripWorkspace(tripId: string) {
+  return tripRepository.getTrip(tripId);
+}
