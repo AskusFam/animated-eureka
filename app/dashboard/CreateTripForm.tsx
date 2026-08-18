@@ -4,13 +4,16 @@ import { FormEvent, useState } from "react";
 
 export function CreateTripForm() {
   const [message, setMessage] = useState("");
+  const [tripId, setTripId] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setMessage("");
-    const form = new FormData(event.currentTarget);
+    setTripId("");
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const response = await fetch("/api/trips", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -19,7 +22,8 @@ export function CreateTripForm() {
     const result = await response.json();
     setBusy(false);
     setMessage(response.ok ? `Trip created: ${result.name}` : result.error);
-    if (response.ok) event.currentTarget.reset();
+    if (response.ok) setTripId(result.id);
+    if (response.ok) formElement.reset();
   }
 
   return (
@@ -31,6 +35,7 @@ export function CreateTripForm() {
       <label>Your phone<input name="organizerPhone" placeholder="+1 555 123 4567" required /></label>
       <button className="button" type="submit" disabled={busy}>{busy ? "Creating…" : "Create trip"}</button>
       {message && <p role="status">{message}</p>}
+      {tripId && <a className="text-link" href={`/trips/${tripId}`}>Open workspace ↗</a>}
     </form>
   );
 }

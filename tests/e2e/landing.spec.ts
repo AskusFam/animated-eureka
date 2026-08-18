@@ -2,9 +2,9 @@ import { expect, test } from "@playwright/test";
 
 test("landing page explains the concierge", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /your group trip/i })).toBeVisible();
-  await expect(page.getByText("Text first")).toBeVisible();
-  await expect(page.getByRole("link", { name: /open prototype dashboard/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /trips worth the group chat/i })).toBeVisible();
+  await expect(page.getByText("A better way")).toBeVisible();
+  await expect(page.getByRole("link", { name: /text rally/i }).first()).toHaveAttribute("href", /sms:.+\?body=RALLY%20WEB%20PLAN/);
 });
 
 test("organizer can create a trip from the dashboard", async ({ page }) => {
@@ -31,4 +31,27 @@ test("trip API creates a participant invitation", async ({ request }) => {
   const invite = await inviteResponse.json();
   expect(invite.participant.phoneNumber).toBe("+15557654321");
   expect(invite.reminder.kind).toBe("invitation");
+});
+
+test("traveler can save a progressive profile", async ({ page }) => {
+  await page.goto("/onboarding?phone=%2B15551234567");
+  await page.getByLabel("Name").fill("Alex Morgan");
+  await page.getByLabel("Email").fill("alex@example.com");
+  await page.getByLabel("Home base").fill("Boston, MA");
+  await page.getByLabel("Time zone").fill("America/New_York");
+  await page.getByRole("button", { name: "Food and culture" }).click();
+  await page.getByRole("button", { name: "Save profile" }).click();
+  await expect(page.getByRole("status")).toContainText("Saved");
+});
+
+test("trip workspace shows the agent roadmap", async ({ page, request }) => {
+  const response = await request.post("/api/trips", {
+    data: { name: "Kyoto spring trip", destination: "Kyoto", organizerName: "Alex", organizerPhone: "+15551234567" },
+  });
+  const trip = await response.json();
+  const workspaceResponse = await request.get(`/api/trips/${trip.id}`);
+  expect(workspaceResponse.ok()).toBeTruthy();
+  await page.goto(`/trips/${trip.id}`);
+  await expect(page.getByText("RallyUp’s next move")).toBeVisible();
+  await expect(page.getByText("Research destinations and options around the group’s intent.")).toBeVisible();
 });

@@ -10,15 +10,33 @@ export type TripRecord = {
   organizerId: string;
 };
 
+export type TripWorkspace = TripRecord & {
+  status: string;
+  participants: Array<{ id: string; name: string | null; phoneNumber: string; role: string; status: string }>;
+};
+
 export interface TripRepository {
   createTrip(input: CreateTripInput): Promise<TripRecord>;
+  getTrip(tripId: string): Promise<TripWorkspace | null>;
   inviteParticipant(input: InviteParticipantInput): Promise<{ id: string; tripId: string; phoneNumber: string }>;
   scheduleReminder(reminder: Reminder, tripId: string): Promise<void>;
 }
 
-const memoryTrips = new Map<string, TripRecord>();
-const memoryParticipants = new Map<string, { id: string; tripId: string; phoneNumber: string }>();
-const memoryReminders: Array<Reminder & { tripId: string }> = [];
+type MemoryStore = {
+  trips: Map<string, TripRecord>;
+  participants: Map<string, { id: string; tripId: string; phoneNumber: string }>;
+  reminders: Array<Reminder & { tripId: string }>;
+};
+
+const runtime = globalThis as typeof globalThis & { __rallyTripMemory?: MemoryStore };
+const memoryStore: MemoryStore = runtime.__rallyTripMemory ??= {
+  trips: new Map(),
+  participants: new Map(),
+  reminders: [],
+};
+const memoryTrips = memoryStore.trips;
+const memoryParticipants = memoryStore.participants;
+const memoryReminders = memoryStore.reminders;
 
 class InMemoryTripRepository implements TripRepository {
   async createTrip(input: CreateTripInput) {
@@ -32,6 +50,21 @@ class InMemoryTripRepository implements TripRepository {
     });
     memoryParticipants.set(organizerId, { id: organizerId, tripId, phoneNumber: input.organizerPhone });
     return memoryTrips.get(tripId)!;
+  }
+
+  async getTrip(tripId: string) {
+    const trip = memoryTrips.get(tripId);
+    if (!trip) return null;
+    return {
+      ...trip,
+      status: "collecting",
+      participants: [...memoryParticipants.values()].filter((participant) => participant.tripId === tripId).map((participant) => ({
+        ...participant,
+        name: null,
+        role: participant.id === trip.organizerId ? "organizer" : "participant",
+        status: participant.id === trip.organizerId ? "active" : "invited",
+      })),
+    };
   }
 
   async inviteParticipant(input: InviteParticipantInput) {
@@ -58,6 +91,26 @@ class PostgresTripRepository implements TripRepository {
       smsOptIn: true,
     }).returning();
     return { id: trip.id, name: trip.name, destination: trip.destination, organizerId: organizer.id };
+  }
+
+  async getTrip(tripId: string) {
+    const trip = await db!.query.trips.findFirst({ where: (table, operators) => operators.eq(table.id, tripId) });
+    if (!trip) return null;
+    const tripParticipants = await db!.query.participants.findMany({ where: (table, operators) => operators.eq(table.tripId, tripId) });
+    return {
+      id: trip.id,
+      name: trip.name,
+      destination: trip.destination,
+      status: trip.status,
+      organizerId: tripParticipants.find((participant) => participant.role === "organizer")?.id ?? "",
+      participants: tripParticipants.map((participant) => ({
+        id: participant.id,
+        name: participant.name,
+        phoneNumber: participant.phoneNumber,
+        role: participant.role,
+        status: participant.status,
+      })),
+    };
   }
 
   async inviteParticipant(input: InviteParticipantInput) {

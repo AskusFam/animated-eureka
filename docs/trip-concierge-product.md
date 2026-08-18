@@ -1,8 +1,8 @@
 # Trip Concierge Product Document
 
-Status: Phase 0 — Product and compliance foundation
+Status: Phase 3 implementation — Agentic concierge MVP
 
-Last updated: 2026-08-14
+Last updated: 2026-08-17
 
 This is the living product, architecture, and validation document for a text-first trip-planning concierge.
 
@@ -279,6 +279,66 @@ The LLM can interpret messages, draft language, summarize responses, and generat
 - Decision on the first SMS provider and number type.
 - Phase 1 prototype plan.
 
+## 10. Agentic experience model
+
+Rally should behave like a bounded agent with an objective, a next action, and a stop condition. It should infer intent from natural language, take useful actions, and ask only for information that blocks the next action.
+
+Primary objectives:
+
+- Discover: explore destinations or trip concepts from a loose idea.
+- Plan a known trip: turn a destination, dates, and travelers into an itinerary.
+- Coordinate a group: collect private preferences, resolve tradeoffs, and move decisions forward.
+
+Agent actions:
+
+- Research destinations.
+- Collect the minimum missing trip detail.
+- Create a review workspace.
+- Collect participant preferences privately.
+- Build an itinerary draft.
+- Request organizer or group approval.
+
+Application logic remains responsible for permissions, consent, trip membership, stored preferences, reminders, spending, and booking. The model can choose language and recommend the next action, but it cannot independently contact a participant, spend money, or finalize a decision without the relevant permission.
+
+## 11. Progressive profile and web workspace
+
+The first profile page should collect only durable information that improves future planning:
+
+- Name, email, home base, and time zone.
+- Travel styles such as food, outdoors, relaxed, luxury, nightlife, or budget-conscious.
+- Typical budget range and trip length.
+- Passport country, accessibility needs, dietary needs, and things to avoid.
+- Planning style, reminder intensity, and whether Rally should ask before contacting the group.
+
+All fields except name, email, home base, and time zone are optional. Profile data should be used as a default, not treated as a permanent rule; the traveler can override it per trip.
+
+The webpage should be introduced after Rally understands the user’s intent, especially when the user is the planner or when a group trip has enough detail to create a workspace. It should feel like a helpful setup page, not a prerequisite form.
+
+The trip workspace is the source of truth for the organizer. It shows Rally’s next move, participants, current trip status, and the four-step plan: discover, coordinate, recommend, and finalize. A future version will add comparisons, approvals, source links, and the shared itinerary.
+
+## 12. Prototype implementation status
+
+Implemented in the current prototype:
+
+- Persistent phone-based conversation sessions with explicit `NEW`, `RESET`, and `START OVER` commands.
+- Intent and flow classification for group, solo, discovery, research, and participant paths.
+- Multi-provider AI routing with curated Gemini, Mistral, OpenRouter, and deterministic fallback candidates.
+- Traveler onboarding page and profile persistence alongside the conversation session.
+- Organizer trip workspace with participant view and agent roadmap.
+- Agent plan selection with bounded actions and onboarding-link handoff.
+- Sendblue inbound idempotency claims to prevent duplicate webhook replies, with a database uniqueness guard and an in-memory fallback.
+- Trace IDs across inbound messages, model/provider timing, outbound sends, and Sendblue delivery callbacks.
+- Conditional progress acknowledgements for slow model calls plus a bounded user-facing fallback when intake times out.
+- Unit coverage for agent decisions and E2E coverage for landing, trip creation, onboarding, invitations, and workspace rendering.
+
+Next implementation slice:
+
+- Add the Groq provider key and verify cross-provider fallback with forced test failures.
+- Add research tools with source capture and freshness timestamps.
+- Add participant-specific preference pages and private response summaries.
+- Add review pages with approve, revise, and ask-the-group actions.
+- Add reminder jobs tied to outstanding agent actions and local quiet hours.
+
 ## 10. Open decisions
 
 The following recommendations are the current working decisions. They should be validated during Phase 1 rather than treated as permanent commitments.
@@ -497,6 +557,90 @@ Start with relational tables for:
 - Reminders and reminder attempts.
 - Learned preferences and feedback.
 - Source records and retrieval timestamps.
+
+## 13. Phase 1 implementation plan — useful end to end
+
+Phase 1 should prove one complete loop with a real organizer and a small group:
+
+```text
+Organizer texts Rally
+    -> Rally creates a trip brief
+    -> Rally asks focused follow-up questions
+    -> Organizer invites participants
+    -> Participants answer privately
+    -> Rally summarizes constraints and gaps
+    -> Research service gathers source-backed options
+    -> Rally sends two or three proposals
+    -> Group gives feedback or votes
+    -> Organizer approves
+    -> Rally publishes a shared itinerary page
+    -> Reminder service moves the group through the next actions
+```
+
+### 13.1 Build order
+
+1. Replace the current keyword reply with a persisted conversation state machine: `new`, `collecting_trip_brief`, `inviting_participants`, `collecting_preferences`, `researching`, `awaiting_feedback`, `approved`, and `completed`.
+2. Make `RALLY WEB PLAN` create or resume a trip for the sender and ask the first useful question.
+3. Add structured extraction for destination, dates, group size, budget, pace, and trip type. Store uncertain fields as candidates until confirmed.
+4. Add participant invitations with explicit `YES`, `NO`, `STOP`, and `HELP` handling.
+5. Add a secure web intake link for longer preferences and a proposal-review page.
+6. Add a research job that searches a small set of approved sources, stores URLs and retrieval timestamps, and returns normalized options.
+7. Add a proposal model with cost range, tradeoffs, source links, confidence, and an explicit `idea`, `researched`, `checked`, or `confirmed` status.
+8. Add SMS feedback commands such as `1`, `2`, `3`, `MORE`, `CHANGE`, and `APPROVE`.
+9. Add the shared itinerary page as the source of truth, then add reminders tied to incomplete actions.
+10. Add an operator review queue before a proposal is marked final.
+
+### 13.2 AI and research boundary
+
+The AI should ask, interpret, summarize, and draft. It should not be the system of record. Deterministic application code owns consent, identity, permissions, state transitions, voting, reminder suppression, and confirmed itinerary data.
+
+The research flow should be:
+
+```text
+Trip requirements
+    -> search query planner
+    -> approved source adapters
+    -> fetch and normalize results
+    -> freshness and constraint checks
+    -> LLM synthesis with citations
+    -> operator or organizer approval
+```
+
+Every researched recommendation must retain its source URL, retrieval time, destination, price context, and uncertainty. International travel information must link to authoritative government or provider sources and be presented as information to verify, not legal or immigration advice.
+
+### 13.3 Model integration decision
+
+Use an `LLMProvider` interface so Rally can call an API model from the backend without coupling product logic to one vendor. The first implementation uses Gemini’s Interactions API from the backend, requesting a strict JSON shape for intent and field extraction, with deterministic validation after every model call. The integration uses the REST endpoint so the current Node 18 deployment does not need a runtime upgrade.
+
+The model provider is intentionally replaceable. Gemini credentials belong in `GEMINI_API_KEY` as a server-only environment variable, and the model is selected with `GEMINI_MODEL`. This does not prevent using other models later for operator review or specialized research tasks.
+
+### 13.4 Carousel concept
+
+Carousels should be used as a decision surface, not as the primary conversation. After research, Rally can send a short text followed by a visual comparison:
+
+> I found three good directions for Lisbon. Swipe through them and reply 1, 2, or 3. I can revise any option.
+
+Each card should represent one coherent plan, for example:
+
+- `1 · Alfama + slow mornings` — lower cost, more walking, food-forward.
+- `2 · Baixa + central nights` — easiest logistics, mid-range cost.
+- `3 · Cascais extension` — more space and beach time, longer transfers.
+
+The image should be a destination or neighborhood image; the message text remains the canonical place for prices, caveats, and source links. The web proposal page remains the richer comparison view.
+
+Sendblue carousels require a V2 line and 2–20 HTTPS image URLs, so the current free shared line should use ordinary text plus single-image links until a V2 line is available. [Sendblue carousel requirements](https://docs.sendblue.com/api-v2/carousel)
+
+### 13.5 Phase 1 definition of done
+
+- An organizer can create a trip and receive a meaningful next question.
+- At least two participants can join privately and complete the core preference flow.
+- Rally can distinguish hard constraints from preferences and ask for clarification.
+- Research results include source links, timestamps, cost context, and caveats.
+- Rally produces two or three proposals and records feedback.
+- An organizer can approve one proposal and publish an itinerary page.
+- Reminders advance incomplete actions and stop after completion, pause, leave, or opt-out.
+- An operator can inspect the full trip timeline and intervene before final approval.
+- The full flow is covered by unit tests and one end-to-end test using mocked Sendblue and research providers.
 
 Use explicit status fields and an append-only message/event history. Do not rely on the latest LLM conversation transcript as the authoritative trip state.
 
