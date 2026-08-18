@@ -72,7 +72,7 @@ export default function HomePage() {
       <nav className="v2-nav" aria-label="Main navigation">
         <Link className="v2-brand" href="/" aria-label="RallyUp home"><span className="v2-mark" aria-hidden="true"><i /><i /><i /></span>RallyUp</Link>
         <div className="v2-nav-links"><a href="#story">How it works</a><a href="#try-it">Try it</a><Link href="/dashboard">Organizer view</Link></div>
-        <a className="v2-nav-cta" href={smsHref}>Text RallyUp <span aria-hidden="true">↗</span></a>
+        <a className="v2-nav-cta" href={smsHref}>Text RallyUp <span aria-hidden="true">↗︎</span></a>
       </nav>
 
       <section className="v2-hero" aria-labelledby="v2-hero-title">
@@ -80,7 +80,7 @@ export default function HomePage() {
           <p className="v2-kicker"><span /> Text-first travel concierge</p>
           <h1 id="v2-hero-title">Trips worth<br /><em>the group chat.</em></h1>
           <p className="v2-hero-subtitle">RallyUp takes the trip from “we should” to “we’re going”—by text, with everyone’s preferences in the plan.</p>
-          <div className="v2-hero-actions"><a className="v2-button v2-button-dark" href={smsHref}>Start with a text <span>↗</span></a><a className="v2-underlink" href="#story">See the whole thing <span>↓</span></a></div>
+          <div className="v2-hero-actions"><a className="v2-button v2-button-dark" href={smsHref}>Start with a text <span>↗︎</span></a><a className="v2-underlink" href="#story">See the whole thing <span>↓︎</span></a></div>
           <div className="v2-trust-line"><span>iMessage first</span><b>·</b><span>No app to download</span><b>·</b><span>Built for real groups</span></div>
         </div>
         <div className="v2-hero-art" aria-label="RallyUp conversation preview">
@@ -88,15 +88,15 @@ export default function HomePage() {
           <div className="hero-orbit hero-orbit-one" /><div className="hero-orbit hero-orbit-two" />
           <div className="v2-hero-note note-left"><span>01</span><strong>Tell it<br /><em>the messy version.</em></strong></div>
           <div className="v2-phone v2-phone-hero">
-            <div className="v2-phone-status"><span>9:41</span><span>● ● ●</span></div>
-            <div className="v2-phone-bar"><span>‹</span><strong>RallyUp<small>Trip concierge</small></strong><span>•••</span></div>
+            <div className="v2-phone-status"><span>9:41</span><span>●︎ ●︎ ●︎</span></div>
+            <div className="v2-phone-bar"><span>‹︎</span><strong>RallyUp<small>Trip concierge</small></strong><span>•︎•︎•︎</span></div>
             <div className="v2-phone-body"><small className="v2-phone-day">TODAY</small><div className="v2-bubble v2-bubble-in">{scene.user}</div><div className="v2-bubble v2-bubble-out">{scene.reply}</div><div className="v2-bubble v2-bubble-out v2-bubble-soft">{scene.followUp}</div><span className="v2-typing"><i /><i /><i /></span></div>
           </div>
-          <div className="v2-hero-note note-right"><span>✳</span><strong>Then it<br /><em>keeps going.</em></strong></div>
+          <div className="v2-hero-note note-right"><span>✳︎</span><strong>Then it<br /><em>keeps going.</em></strong></div>
         </div>
       </section>
 
-      <section className="v2-marquee" aria-label="RallyUp principles"><div><span>Less chasing</span><i>✳</i><span>More going</span><i>✳</i><span>Plans with a pulse</span><i>✳</i><span>Less chasing</span><i>✳</i><span>More going</span></div></section>
+      <section className="v2-marquee" aria-label="RallyUp principles"><div><span>Less chasing</span><i>✳︎</i><span>More going</span><i>✳︎</i><span>Plans with a pulse</span><i>✳︎</i><span>Less chasing</span><i>✳︎</i><span>More going</span></div></section>
 
       <section className="v2-story" id="story" aria-labelledby="story-title">
         <div className="v2-story-intro"><p className="v2-kicker"><span /> The simple version</p><h2 id="story-title">A better way<br /><em>to make plans.</em></h2><p>There is always one person who becomes the trip planner by accident. RallyUp gives the work back to the group—and stays close enough to keep it moving.</p></div>
@@ -104,18 +104,18 @@ export default function HomePage() {
           <div className="v2-story-list">
             {storySteps.map((step) => <article className="v2-story-step" key={step.number}><span>{step.number}</span><div><h3>{step.title}</h3><p>{step.copy}</p></div></article>)}
           </div>
-          <div className="v2-sticky-wrap"><div className="v2-sticky-card"><div className="v2-sticky-label">RallyUp, in the thread</div><div className="v2-sticky-quote">“I’ll ask around and bring you back something everyone can say yes to.”</div><div className="v2-sticky-line"><span /><small>gathering the good stuff</small></div><div className="v2-sticky-footer"><span>RallyUp</span><span>•••</span></div></div><p className="v2-sticky-caption">The group chat<br /><em>finally has a co-pilot.</em></p></div>
+          <div className="v2-sticky-wrap"><div className="v2-sticky-card"><div className="v2-sticky-label">RallyUp, in the thread</div><div className="v2-sticky-quote">“I’ll ask around and bring you back something everyone can say yes to.”</div><div className="v2-sticky-line"><span /><small>gathering the good stuff</small></div><div className="v2-sticky-footer"><span>RallyUp</span><span>•︎•︎•︎</span></div></div><p className="v2-sticky-caption">The group chat<br /><em>finally has a co-pilot.</em></p></div>
         </div>
       </section>
 
       <section className="v2-choice" id="try-it" aria-labelledby="choice-title">
         <div className="v2-choice-heading"><p className="v2-kicker"><span /> See yourself here</p><h2 id="choice-title">Start wherever<br /><em>you are.</em></h2><p>Every trip has a different first text. Pick one to see how RallyUp finds the thread.</p></div>
-        <div className="v2-choice-tabs" role="tablist" aria-label="Trip examples">{scenes.map((item, index) => <button key={item.label} type="button" role="tab" aria-selected={sceneIndex === index} className={sceneIndex === index ? "v2-choice-tab is-active" : "v2-choice-tab"} onClick={() => chooseScene(index)}><span>0{index + 1}</span>{item.label}<b>↗</b></button>)}</div>
-        <div className="v2-experience"><div className="v2-experience-copy"><p className="v2-kicker"><span /> {scene.label}</p><h3>{scene.headline}</h3><p>RallyUp turns a half-formed idea into a few directions with a point of view.</p><a className="v2-underlink" href={smsHref}>Try this with RallyUp <span>↗</span></a></div><div className="v2-carousel-card"><div className={`v2-carousel-image color-${card.color}`}><span>{card.title.slice(0, 1)}</span><small>RALLYUP / {String(cardIndex + 1).padStart(2, "0")}</small></div><div className="v2-carousel-details"><div><strong>{card.title}</strong><small>{card.detail}</small></div><div className="v2-carousel-controls"><button type="button" onClick={() => moveCard(-1)} aria-label="Previous trip direction">←</button><span>{cardIndex + 1} / {scene.cards.length}</span><button type="button" onClick={() => moveCard(1)} aria-label="Next trip direction">→</button></div></div></div></div>
+        <div className="v2-choice-tabs" role="tablist" aria-label="Trip examples">{scenes.map((item, index) => <button key={item.label} type="button" role="tab" aria-selected={sceneIndex === index} className={sceneIndex === index ? "v2-choice-tab is-active" : "v2-choice-tab"} onClick={() => chooseScene(index)}><span>0{index + 1}</span>{item.label}<b>↗︎</b></button>)}</div>
+        <div className="v2-experience"><div className="v2-experience-copy"><p className="v2-kicker"><span /> {scene.label}</p><h3>{scene.headline}</h3><p>RallyUp turns a half-formed idea into a few directions with a point of view.</p><a className="v2-underlink" href={smsHref}>Try this with RallyUp <span>↗︎</span></a></div><div className="v2-carousel-card"><div className={`v2-carousel-image color-${card.color}`}><span>{card.title.slice(0, 1)}</span><small>RALLYUP / {String(cardIndex + 1).padStart(2, "0")}</small></div><div className="v2-carousel-details"><div><strong>{card.title}</strong><small>{card.detail}</small></div><div className="v2-carousel-controls"><button type="button" onClick={() => moveCard(-1)} aria-label="Previous trip direction">←︎</button><span>{cardIndex + 1} / {scene.cards.length}</span><button type="button" onClick={() => moveCard(1)} aria-label="Next trip direction">→︎</button></div></div></div></div>
       </section>
 
-      <section className="v2-final"><p className="v2-kicker"><span /> Good trips take coordination</p><h2>Give RallyUp<br /><em>the group chat.</em></h2><a className="v2-button v2-button-coral" href={smsHref}>Text RallyUp <span>↗</span></a></section>
-      <footer className="v2-footer"><Link className="v2-brand" href="/"><span className="v2-mark" aria-hidden="true"><i /><i /><i /></span>RallyUp</Link><span>Trips, handled.</span><Link href="/dashboard">Organizer view ↗</Link></footer>
+      <section className="v2-final"><p className="v2-kicker"><span /> Good trips take coordination</p><h2>Give RallyUp<br /><em>the group chat.</em></h2><a className="v2-button v2-button-coral" href={smsHref}>Text RallyUp <span>↗︎</span></a></section>
+      <footer className="v2-footer"><Link className="v2-brand" href="/"><span className="v2-mark" aria-hidden="true"><i /><i /><i /></span>RallyUp</Link><span>Trips, handled.</span><Link href="/dashboard">Organizer view ↗︎</Link></footer>
     </main>
   );
 }
