@@ -24,6 +24,7 @@ export type TravelerProfile = {
 export type SessionIntake = Partial<TripIntake> & {
   profile?: TravelerProfile;
   onboardingOffered?: boolean;
+  optionSetSent?: boolean;
 };
 export type ConversationSession = {
   id: string;

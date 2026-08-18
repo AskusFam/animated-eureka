@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
-import { messages, participants } from "@/lib/db/schema";
+import { messageOptionMap, messages, optionReactions, participants } from "@/lib/db/schema";
 import { buildConciergeReply } from "@/lib/concierge/respond";
 import { extractTripIntake, fallbackTripIntake, hasCoreTripBrief, intakeReply } from "@/lib/concierge/intake";
 import { buildAgentPlan } from "@/lib/concierge/agent";
@@ -10,6 +10,8 @@ import { getSession, getTravelerProfile, isFreshSessionCommand, saveSession } fr
 import { parseAttribution } from "@/lib/messaging/attribution";
 import { allowInbound } from "@/lib/messaging/rate-limit";
 import { sendblueMessage } from "@/lib/messaging/sendblue-provider";
+import { sendTripOptionCarousel } from "@/lib/messaging/option-carousel";
+import { parseSendblueReaction } from "@/lib/messaging/sendblue-reaction";
 import { createTrip } from "@/lib/trips/service";
 import { isValidSendblueWebhook } from "@/lib/messaging/sendblue-webhook";
 import { claimInboundMessage } from "@/lib/messaging/inbound-idempotency";
@@ -58,6 +60,28 @@ export async function POST(request: Request) {
   const from = String(payload.from_number ?? payload.number ?? "");
   const body = String(payload.content ?? "");
   const messageHandle = String(payload.message_handle ?? "");
+
+  const reaction = parseSendblueReaction(payload as Record<string, unknown>);
+  if (reaction) {
+    if (db) {
+      const [mapped] = await db.select({ tripOptionId: messageOptionMap.tripOptionId, participantId: messageOptionMap.participantId })
+        .from(messageOptionMap)
+        .where(eq(messageOptionMap.providerMessageHandle, reaction.messageHandle))
+        .limit(1);
+      if (mapped) {
+        await db.insert(optionReactions).values({
+          tripOptionId: mapped.tripOptionId,
+          participantId: mapped.participantId,
+          providerMessageHandle: reaction.messageHandle,
+          reactionType: reaction.reactionType,
+        });
+        console.info("Rally option reaction recorded", { traceId, from: reaction.from, optionId: mapped.tripOptionId, reactionType: reaction.reactionType });
+      } else {
+        console.info("Rally option reaction could not be matched", { traceId, from: reaction.from, messageHandle: reaction.messageHandle });
+      }
+    }
+    return NextResponse.json({ ok: true, reaction: true });
+  }
 
   if (!from || !body || payload.is_outbound === true) return NextResponse.json({ ok: true });
   if (payload.service && payload.service !== "iMessage") return NextResponse.json({ ok: true, ignored: "iMessage only" });
@@ -207,6 +231,29 @@ export async function POST(request: Request) {
       .from(participants)
       .where(eq(participants.phoneNumber, from))
       .limit(1);
+  }
+
+  if (session?.tripId && session.intake.destination && session.intake.dates && session.intake.groupSize && !session.intake.optionSetSent) {
+    try {
+      await sendTripOptionCarousel({
+        tripId: session.tripId,
+        participantId: session.participantId,
+        to: from,
+        destination: session.intake.destination,
+        tripStyle: session.intake.tripStyle,
+        traceId,
+      });
+      await saveSession({
+        id: session.id,
+        phoneNumber: session.phoneNumber,
+        tripId: session.tripId,
+        participantId: session.participantId,
+        state: session.state,
+        intake: { ...session.intake, optionSetSent: true },
+      });
+    } catch (error) {
+      console.error("Rally option carousel failed", { traceId, message: error instanceof Error ? error.message : String(error) });
+    }
   }
   if (db && inboundMessageId) {
     await db.update(messages).set({ tripId: participant?.tripId, participantId: participant?.id }).where(eq(messages.id, inboundMessageId));

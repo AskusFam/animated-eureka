@@ -85,3 +85,50 @@ export const reminders = pgTable("reminders", {
   sentAt: timestamp("sent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const tripOptions = pgTable("trip_options", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tripId: uuid("trip_id").references(() => trips.id).notNull(),
+  code: text("code").notNull(),
+  title: text("title").notNull(),
+  summary: text("summary").notNull(),
+  destination: text("destination"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  tripCodeUnique: uniqueIndex("trip_options_trip_code_unique").on(table.tripId, table.code),
+}));
+
+export const mediaAssets = pgTable("media_assets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  cacheKey: text("cache_key").notNull().unique(),
+  url: text("url").notNull(),
+  kind: text("kind").notNull().default("trip_option"),
+  source: text("source").notNull().default("curated_fallback"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const tripOptionAssets = pgTable("trip_option_assets", {
+  tripOptionId: uuid("trip_option_id").references(() => tripOptions.id).notNull(),
+  mediaAssetId: uuid("media_asset_id").references(() => mediaAssets.id).notNull(),
+}, (table) => ({
+  optionAssetUnique: uniqueIndex("trip_option_assets_unique").on(table.tripOptionId, table.mediaAssetId),
+}));
+
+export const messageOptionMap = pgTable("message_option_map", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  messageId: uuid("message_id").references(() => messages.id).notNull(),
+  tripOptionId: uuid("trip_option_id").references(() => tripOptions.id).notNull(),
+  participantId: uuid("participant_id").references(() => participants.id),
+  providerMessageHandle: text("provider_message_handle").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const optionReactions = pgTable("option_reactions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tripOptionId: uuid("trip_option_id").references(() => tripOptions.id).notNull(),
+  participantId: uuid("participant_id").references(() => participants.id),
+  providerMessageHandle: text("provider_message_handle").notNull(),
+  reactionType: text("reaction_type").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
