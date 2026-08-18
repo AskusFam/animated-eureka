@@ -2,22 +2,22 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Rally — group trips, handled by text",
-  description: "A text-first concierge for planning trips with your group.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://trip-concierge-henna.vercel.app"),
+  title: "RallyUp — group trips, handled by text",
+  description: "RallyUp is the travel concierge that lives in your texts.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://tryrallyup.com"),
   openGraph: {
-    title: "Rally — group trips, handled by text",
-    description: "Tell Rally where you want to go. It gets the group aligned and keeps the plan moving.",
+    title: "RallyUp — group trips, handled by text",
+    description: "Tell RallyUp where you want to go. It gets the group aligned and keeps the plan moving.",
     url: "/",
-    siteName: "Rally",
+    siteName: "RallyUp",
     type: "website",
-    images: [{ url: "/rally-logo.png", width: 1600, height: 440, alt: "Rally — trips, handled" }],
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "RallyUp — trips, handled by text" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Rally — group trips, handled by text",
+    title: "RallyUp — group trips, handled by text",
     description: "A travel concierge that lives in your texts.",
-    images: ["/rally-logo.png"],
+    images: ["/opengraph-image"],
   },
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],

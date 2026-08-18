@@ -2,15 +2,15 @@ export function buildConciergeReply(body: string) {
   const normalized = body.trim().toLowerCase();
 
   if (normalized === "stop") {
-    return "You’re unsubscribed from Trip Concierge messages. Reply START to rejoin or HELP for help.";
+    return "You’re unsubscribed from RallyUp messages. Reply START to rejoin or HELP for help.";
   }
 
   if (normalized === "help") {
-    return "Trip Concierge helps groups plan trips by text. Reply STOP to unsubscribe. Email support@example.com for help.";
+    return "RallyUp helps groups plan trips by text. Reply STOP to unsubscribe. Email support@example.com for help.";
   }
 
   if (normalized === "start") {
-    return "Welcome back to Trip Concierge. Reply PLAN to start a trip or HELP for help.";
+    return "Welcome back to RallyUp. Reply PLAN to start a trip or HELP for help.";
   }
 
   if (normalized === "plan") {

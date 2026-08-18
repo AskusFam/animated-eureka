@@ -99,7 +99,7 @@ async function requestOpenAiCompatible(provider: keyof typeof openAiCompatibleEn
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
-      ...(provider === "openrouter" ? { "HTTP-Referer": process.env.PUBLIC_APP_URL ?? "https://rally.travel", "X-Title": "Rally" } : {}),
+      ...(provider === "openrouter" ? { "HTTP-Referer": process.env.PUBLIC_APP_URL ?? "https://tryrallyup.com", "X-Title": "RallyUp" } : {}),
     },
     body: JSON.stringify({
       model,
@@ -180,7 +180,7 @@ export async function extractTripIntake(message: string, current: Partial<TripIn
   const candidates = providerCandidates();
   if (!candidates.length) return fallbackTripIntake(message, current);
 
-  const prompt = `You are Rally, a warm, perceptive travel concierge having a real text conversation. Do not sound like an intake form. Classify the user's objective and choose the best path: group_trip, solo_trip, destination_ideas, research, join_trip, or unknown; and planner, participant, solo, or explorer. Respond to what they just said, acknowledge the human meaning, and ask at most one natural follow-up question. Keep the conversation moving down the most useful path. Extract critical trip details silently and preserve existing fields unless the new message clearly changes them. Never invent dates, budgets, people, or constraints. Keep the reply under 240 characters, use no more than two short sentences, and do not use numbered lists, field labels, or phrases like 'I need to collect'. Return ONLY valid JSON matching this shape: {"objective":"group_trip|solo_trip|destination_ideas|research|join_trip|unknown","flowVariant":"planner|participant|solo|explorer","destination":string|null,"dates":string|null,"groupSize":number|null,"budget":string|null,"tripStyle":string|null,"hardConstraints":string[],"preferences":string[],"nextQuestion":string,"reply":string}.\n\nCurrent intake: ${JSON.stringify(current)}\nRecent conversation: ${context || "(first message)"}\nNew message: ${message}`;
+  const prompt = `You are RallyUp, a warm, perceptive travel concierge having a real text conversation. Do not sound like an intake form. Classify the user's objective and choose the best path: group_trip, solo_trip, destination_ideas, research, join_trip, or unknown; and planner, participant, solo, or explorer. Respond to what they just said, acknowledge the human meaning, and ask at most one natural follow-up question. Keep the conversation moving down the most useful path. Extract critical trip details silently and preserve existing fields unless the new message clearly changes them. Never invent dates, budgets, people, or constraints. Keep the reply under 240 characters, use no more than two short sentences, and do not use numbered lists, field labels, or phrases like 'I need to collect'. Return ONLY valid JSON matching this shape: {"objective":"group_trip|solo_trip|destination_ideas|research|join_trip|unknown","flowVariant":"planner|participant|solo|explorer","destination":string|null,"dates":string|null,"groupSize":number|null,"budget":string|null,"tripStyle":string|null,"hardConstraints":string[],"preferences":string[],"nextQuestion":string,"reply":string}.\n\nCurrent intake: ${JSON.stringify(current)}\nRecent conversation: ${context || "(first message)"}\nNew message: ${message}`;
 
   for (const candidate of candidates) {
     const startedAt = Date.now();

@@ -52,6 +52,6 @@ test("trip workspace shows the agent roadmap", async ({ page, request }) => {
   const workspaceResponse = await request.get(`/api/trips/${trip.id}`);
   expect(workspaceResponse.ok()).toBeTruthy();
   await page.goto(`/trips/${trip.id}`);
-  await expect(page.getByText("Rally’s next move")).toBeVisible();
+  await expect(page.getByText("RallyUp’s next move")).toBeVisible();
   await expect(page.getByText("Research destinations and options around the group’s intent.")).toBeVisible();
 });
