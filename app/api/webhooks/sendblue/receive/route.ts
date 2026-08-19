@@ -255,8 +255,10 @@ export async function POST(request: Request) {
       console.error("Rally option carousel failed", { traceId, message: error instanceof Error ? error.message : String(error) });
     }
   }
-  if (db && inboundMessageId) {
-    await db.update(messages).set({ tripId: participant?.tripId, participantId: participant?.id }).where(eq(messages.id, inboundMessageId));
+  if (db && inboundMessageId && participant) {
+    await db.update(messages).set({ tripId: participant.tripId, participantId: participant.id }).where(eq(messages.id, inboundMessageId));
+  } else if (db && inboundMessageId) {
+    console.info("Rally inbound participant link skipped", { traceId, from });
   }
 
   try {
