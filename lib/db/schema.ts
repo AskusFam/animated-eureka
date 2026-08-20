@@ -89,6 +89,7 @@ export const reminders = pgTable("reminders", {
 export const tripOptions = pgTable("trip_options", {
   id: uuid("id").defaultRandom().primaryKey(),
   tripId: uuid("trip_id").references(() => trips.id).notNull(),
+  stage: text("stage").default("place").notNull(),
   code: text("code").notNull(),
   title: text("title").notNull(),
   summary: text("summary").notNull(),
@@ -96,8 +97,28 @@ export const tripOptions = pgTable("trip_options", {
   metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
-  tripCodeUnique: uniqueIndex("trip_options_trip_code_unique").on(table.tripId, table.code),
+  tripStageCodeUnique: uniqueIndex("trip_options_trip_stage_code_unique").on(table.tripId, table.stage, table.code),
 }));
+
+export const tripVotes = pgTable("trip_votes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tripId: uuid("trip_id").references(() => trips.id).notNull(),
+  stage: text("stage").notNull(),
+  voterKey: text("voter_key").notNull(),
+  optionId: uuid("option_id").references(() => tripOptions.id).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  tripStageVoterUnique: uniqueIndex("trip_votes_trip_stage_voter_unique").on(table.tripId, table.stage, table.voterKey),
+}));
+
+export const itineraries = pgTable("itineraries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tripId: uuid("trip_id").references(() => trips.id).notNull().unique(),
+  content: jsonb("content").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
 
 export const mediaAssets = pgTable("media_assets", {
   id: uuid("id").defaultRandom().primaryKey(),

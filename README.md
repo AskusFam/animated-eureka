@@ -32,3 +32,7 @@ npm run build
 ```
 
 The app runs in preview mode when `MESSAGING_PROVIDER` is not `sendblue`. Configure Sendblue only in server-side environment variables; never expose API credentials to the browser.
+
+## Production database migrations
+
+Migration-bearing changes that reach `main` trigger `.github/workflows/migrate-production.yml`. Add the Neon production connection string as a repository secret named `DATABASE_URL`. The workflow also supports a manual `workflow_dispatch` rerun from GitHub Actions. Migrations stay separate from Vercel builds so a web deploy cannot partially apply schema changes.
