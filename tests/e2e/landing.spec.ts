@@ -55,3 +55,20 @@ test("trip workspace shows the agent roadmap", async ({ page, request }) => {
   await expect(page.getByText("RallyUp’s next move")).toBeVisible();
   await expect(page.getByText("Research destinations and options around the group’s intent.")).toBeVisible();
 });
+
+test("trip decision page supports staged voting and a daily itinerary", async ({ page, request }) => {
+  const response = await request.post("/api/trips", {
+    data: { name: "Nashville group trip", destination: "Nashville", organizerName: "Alex", organizerPhone: "+15551234567" },
+  });
+  const trip = await response.json();
+  await page.goto(`/trips/${trip.id}/plan`);
+  await expect(page.getByRole("heading", { name: "Pick the direction" })).toBeVisible();
+  await page.getByRole("button", { name: "Pick this direction" }).first().click();
+  await expect(page.getByRole("heading", { name: "Choose the base" })).toBeVisible();
+  await page.getByRole("button", { name: "Pick this direction" }).first().click();
+  await expect(page.getByRole("heading", { name: "Set the rhythm" })).toBeVisible();
+  await page.getByRole("button", { name: "Pick this direction" }).first().click();
+  await page.getByRole("button", { name: /build the daily itinerary/i }).click();
+  await expect(page.getByRole("heading", { name: /a considered group itinerary/i })).toBeVisible();
+  await expect(page.getByText("Day 1")).toBeVisible();
+});
