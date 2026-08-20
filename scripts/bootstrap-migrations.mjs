@@ -31,7 +31,7 @@ try {
   const tables = await sql`
     SELECT table_name FROM information_schema.tables
     WHERE table_schema = 'public'
-      AND table_name = ANY(${sql.array(requiredTables, "text")})
+      AND table_name IN (${sql.join(requiredTables.map((table) => sql`${table}`), sql`, `)})
   `;
   const present = new Set(tables.map(({ table_name }) => table_name));
   if (!requiredTables.every((table) => present.has(table))) {
