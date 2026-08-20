@@ -38,5 +38,8 @@ jobs:
       - name: Verify database secret exists
         run: test -n "$DATABASE_URL"
 
+      - name: Bootstrap existing migration history
+        run: node scripts/bootstrap-migrations.mjs
+
       - name: Apply migrations
         run: npm run db:migrate

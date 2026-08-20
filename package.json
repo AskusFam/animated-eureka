@@ -12,6 +12,7 @@
     "test:e2e": "playwright test",
     "test": "npm run test:unit && npm run test:e2e",
     "db:generate": "drizzle-kit generate",
+    "db:bootstrap": "node scripts/bootstrap-migrations.mjs",
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
