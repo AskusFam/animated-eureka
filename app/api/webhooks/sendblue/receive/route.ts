@@ -220,7 +220,7 @@ export async function POST(request: Request) {
       traceId,
       hasSession: Boolean(session),
       state: nextState,
-      provider: process.env.GEMINI_API_KEY ? "gemini" : "fallback",
+      provider: process.env.OPENAI_API_KEY ? "openai" : process.env.GEMINI_API_KEY ? "gemini" : "fallback",
       agentObjective: agentPlan.objective,
       agentAction: agentPlan.action,
     });

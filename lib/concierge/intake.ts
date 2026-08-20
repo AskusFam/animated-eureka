@@ -17,6 +17,7 @@ export const tripIntakeSchema = z.object({
 export type TripIntake = z.infer<typeof tripIntakeSchema>;
 
 const geminiEndpoint = "https://generativelanguage.googleapis.com/v1beta/interactions";
+const openaiEndpoint = "https://api.openai.com/v1/responses";
 const openAiCompatibleEndpoint = {
   groq: "https://api.groq.com/openai/v1/chat/completions",
   mistral: "https://api.mistral.ai/v1/chat/completions",
@@ -92,6 +93,39 @@ async function requestGemini(model: string, prompt: string) {
   return output;
 }
 
+function extractResponsesText(payload: { output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>; output_text?: string }) {
+  return payload.output_text ?? payload.output
+    ?.filter((item) => item.type === "message")
+    .flatMap((item) => item.content ?? [])
+    .filter((part) => part.type === "output_text")
+    .map((part) => part.text ?? "")
+    .join("");
+}
+
+async function requestOpenAI(model: string, prompt: string) {
+  const response = await fetch(openaiEndpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model,
+      reasoning: { effort: "low" },
+      instructions: "Return only the requested structured JSON. Do not include markdown fences or commentary outside the JSON.",
+      input: prompt,
+      max_output_tokens: 900,
+      text: { format: { type: "json_schema", name: "trip_intake", strict: true, schema: tripIntakeJsonSchema } },
+    }),
+    signal: AbortSignal.timeout(12_000),
+  });
+  const payload = await response.json() as { output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>; output_text?: string; error?: { message?: string } };
+  if (!response.ok) throw new ProviderRequestError("openai", model, response.status, payload.error?.message ?? "request failed");
+  const output = extractResponsesText(payload);
+  if (!output) throw new ProviderRequestError("openai", model, 502, "no text output");
+  return output;
+}
+
 async function requestOpenAiCompatible(provider: keyof typeof openAiCompatibleEndpoint, model: string, prompt: string) {
   const key = provider === "groq" ? process.env.GROQ_API_KEY : provider === "mistral" ? process.env.MISTRAL_API_KEY : process.env.OPENROUTER_API_KEY;
   const response = await fetch(openAiCompatibleEndpoint[provider], {
@@ -121,6 +155,11 @@ async function requestOpenAiCompatible(provider: keyof typeof openAiCompatibleEn
 
 function providerCandidates(): ProviderCandidate[] {
   const candidates: ProviderCandidate[] = [];
+  if (process.env.OPENAI_API_KEY) {
+    for (const model of configuredModels("OPENAI_MODELS", "OPENAI_MODEL", ["gpt-5.6"])) {
+      candidates.push({ provider: "openai", model, request: (prompt) => requestOpenAI(model, prompt) });
+    }
+  }
   if (process.env.GEMINI_API_KEY) {
     for (const model of configuredModels("GEMINI_MODELS", "GEMINI_MODEL", ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"])) {
       candidates.push({ provider: "gemini", model, request: (prompt) => requestGemini(model, prompt) });
