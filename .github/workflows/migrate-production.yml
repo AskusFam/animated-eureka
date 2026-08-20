@@ -7,6 +7,7 @@ on:
       - "drizzle/**"
       - "lib/db/schema.ts"
       - "drizzle.config.ts"
+      - "scripts/**"
       - "package.json"
       - "package-lock.json"
   workflow_dispatch:
