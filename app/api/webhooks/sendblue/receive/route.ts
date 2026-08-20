@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { messageOptionMap, messages, optionReactions, participants } from "@/lib/db/schema";
 import { buildConciergeReply } from "@/lib/concierge/respond";
-import { extractTripIntake, fallbackTripIntake, hasCoreTripBrief, intakeReply } from "@/lib/concierge/intake";
+import { extractTripIntakeWithMeta, fallbackTripIntake, hasCoreTripBrief, intakeReply } from "@/lib/concierge/intake";
 import { buildAgentPlan } from "@/lib/concierge/agent";
 import { getSession, getTravelerProfile, isFreshSessionCommand, saveSession } from "@/lib/concierge/session";
 import { parseAttribution } from "@/lib/messaging/attribution";
@@ -17,7 +17,6 @@ import { isValidSendblueWebhook } from "@/lib/messaging/sendblue-webhook";
 import { claimInboundMessage } from "@/lib/messaging/inbound-idempotency";
 
 const intakeTimeoutMs = 16_000;
-const progressAckDelayMs = 2_500;
 const runtime = globalThis as typeof globalThis & { __rallyInboundMessageClaims?: Map<string, number> };
 const inboundMessageClaims = runtime.__rallyInboundMessageClaims ??= new Map();
 
@@ -32,20 +31,6 @@ async function withTimeout<T>(work: Promise<T>, timeoutMs: number): Promise<T> {
     ]);
   } finally {
     if (timeout) clearTimeout(timeout);
-  }
-}
-
-async function withProgressAck<T>(work: Promise<T>, sendProgressAck: () => Promise<void>): Promise<T> {
-  let progressAck: Promise<void> | undefined;
-  const progressTimer = setTimeout(() => {
-    progressAck = sendProgressAck().catch(() => undefined);
-  }, progressAckDelayMs);
-  try {
-    const result = await work;
-    if (progressAck) await progressAck;
-    return result;
-  } finally {
-    clearTimeout(progressTimer);
   }
 }
 
@@ -85,7 +70,15 @@ export async function POST(request: Request) {
 
   if (!from || !body || payload.is_outbound === true) return NextResponse.json({ ok: true });
   if (payload.service && payload.service !== "iMessage") return NextResponse.json({ ok: true, ignored: "iMessage only" });
-  if (!allowInbound(from)) return NextResponse.json({ ok: true, ignored: "rate limited" });
+  const controlMessage = isFreshSessionCommand(body) || /^(stop|help|start)$/i.test(body.trim());
+  if (!controlMessage && !allowInbound(from)) {
+    console.warn("Rally inbound rate limited", {
+      traceId,
+      from,
+      limitPerHour: Number(process.env.INBOUND_RATE_LIMIT_PER_HOUR ?? 8),
+    });
+    return NextResponse.json({ ok: true, ignored: "rate limited" });
+  }
 
   console.info("Rally inbound received", { traceId, from, providerMessageId: messageHandle || undefined, bodyLength: body.length });
 
@@ -156,12 +149,14 @@ export async function POST(request: Request) {
       : [];
     const context = recentMessages.reverse().map((item) => `${item.direction}: ${item.body}`).join("\n");
     let intake;
+    let intakeProvider = "fallback";
+    let intakeModel = "deterministic";
     let intakeFailed = false;
     try {
-      intake = await withProgressAck(
-        withTimeout(extractTripIntake(attribution.message, session?.intake ?? {}, context, traceId), intakeTimeoutMs),
-        () => sendAndRecord("I’m on it — give me a moment to think this through.", "progress_ack"),
-      );
+      const intakeResult = await withTimeout(extractTripIntakeWithMeta(attribution.message, session?.intake ?? {}, context, traceId), intakeTimeoutMs);
+      intake = intakeResult.intake;
+      intakeProvider = intakeResult.provider;
+      intakeModel = intakeResult.model;
     } catch (error) {
       intakeFailed = true;
       console.error("Rally intake failed; using bounded fallback", {
@@ -205,8 +200,9 @@ export async function POST(request: Request) {
     }
     const agentPlan = buildAgentPlan(intake, getTravelerProfile(session));
     const onboardingOffered = Boolean(session.intake.onboardingOffered);
-    if (agentPlan.action === "create_review_workspace" && !onboardingOffered && process.env.PUBLIC_APP_URL) {
-      reply = `${reply.slice(0, 150).trim()} Quick setup: ${process.env.PUBLIC_APP_URL}/onboarding?phone=${encodeURIComponent(from)}&tripId=${encodeURIComponent(session.tripId ?? "")}`;
+    const shouldOfferPlannerPage = agentPlan.objective === "coordinate_group" && !onboardingOffered && process.env.PUBLIC_APP_URL;
+    if (shouldOfferPlannerPage) {
+      reply = `${reply.slice(0, 125).trim()} I’ll rally the group from here. Quick profile: ${process.env.PUBLIC_APP_URL}/onboarding?phone=${encodeURIComponent(from)}&tripId=${encodeURIComponent(session.tripId ?? "")}`;
       await saveSession({
         id: session.id,
         phoneNumber: from,
@@ -220,7 +216,8 @@ export async function POST(request: Request) {
       traceId,
       hasSession: Boolean(session),
       state: nextState,
-      provider: process.env.OPENAI_API_KEY ? "openai" : process.env.GEMINI_API_KEY ? "gemini" : "fallback",
+      provider: intakeProvider,
+      model: intakeModel,
       agentObjective: agentPlan.objective,
       agentAction: agentPlan.action,
     });

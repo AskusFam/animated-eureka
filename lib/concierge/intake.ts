@@ -27,8 +27,30 @@ const openAiCompatibleEndpoint = {
 type ProviderCandidate = {
   provider: string;
   model: string;
-  request: (prompt: string) => Promise<string>;
+  request: (prompt: string, signal: AbortSignal) => Promise<string>;
 };
+
+export type TripIntakeResult = {
+  intake: TripIntake;
+  provider: string;
+  model: string;
+};
+
+const providerTimeoutMs = 7_000;
+const totalIntakeTimeoutMs = 15_000;
+
+function mergeTripIntake(current: Partial<TripIntake>, parsed: TripIntake): TripIntake {
+  return {
+    ...parsed,
+    destination: parsed.destination ?? current.destination ?? null,
+    dates: parsed.dates ?? current.dates ?? null,
+    groupSize: parsed.groupSize ?? current.groupSize ?? null,
+    budget: parsed.budget ?? current.budget ?? null,
+    tripStyle: parsed.tripStyle ?? current.tripStyle ?? null,
+    hardConstraints: [...new Set([...(current.hardConstraints ?? []), ...parsed.hardConstraints])],
+    preferences: [...new Set([...(current.preferences ?? []), ...parsed.preferences])],
+  };
+}
 
 class ProviderRequestError extends Error {
   constructor(public readonly provider: string, public readonly model: string, public readonly status: number, message: string) {
@@ -72,7 +94,7 @@ function parseProviderOutput(output: string) {
   return JSON.parse(start >= 0 && end > start ? cleaned.slice(start, end + 1) : cleaned);
 }
 
-async function requestGemini(model: string, prompt: string) {
+async function requestGemini(model: string, prompt: string, signal: AbortSignal) {
   const response = await fetch(geminiEndpoint, {
     method: "POST",
     headers: {
@@ -84,7 +106,7 @@ async function requestGemini(model: string, prompt: string) {
       input: prompt,
       system_instruction: "Return only valid JSON. Do not include markdown fences.",
     }),
-    signal: AbortSignal.timeout(12_000),
+    signal,
   });
   const payload = await response.json() as { output_text?: string; steps?: Array<{ content?: Array<{ type?: string; text?: string }> }>; error?: { message?: string } };
   if (!response.ok) throw new ProviderRequestError("gemini", model, response.status, payload.error?.message ?? "request failed");
@@ -102,7 +124,7 @@ function extractResponsesText(payload: { output?: Array<{ type?: string; content
     .join("");
 }
 
-async function requestOpenAI(model: string, prompt: string) {
+async function requestOpenAI(model: string, prompt: string, signal: AbortSignal) {
   const response = await fetch(openaiEndpoint, {
     method: "POST",
     headers: {
@@ -117,7 +139,7 @@ async function requestOpenAI(model: string, prompt: string) {
       max_output_tokens: 900,
       text: { format: { type: "json_schema", name: "trip_intake", strict: true, schema: tripIntakeJsonSchema } },
     }),
-    signal: AbortSignal.timeout(12_000),
+    signal,
   });
   const payload = await response.json() as { output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>; output_text?: string; error?: { message?: string } };
   if (!response.ok) throw new ProviderRequestError("openai", model, response.status, payload.error?.message ?? "request failed");
@@ -126,7 +148,7 @@ async function requestOpenAI(model: string, prompt: string) {
   return output;
 }
 
-async function requestOpenAiCompatible(provider: keyof typeof openAiCompatibleEndpoint, model: string, prompt: string) {
+async function requestOpenAiCompatible(provider: keyof typeof openAiCompatibleEndpoint, model: string, prompt: string, signal: AbortSignal) {
   const key = provider === "groq" ? process.env.GROQ_API_KEY : provider === "mistral" ? process.env.MISTRAL_API_KEY : process.env.OPENROUTER_API_KEY;
   const response = await fetch(openAiCompatibleEndpoint[provider], {
     method: "POST",
@@ -144,7 +166,7 @@ async function requestOpenAiCompatible(provider: keyof typeof openAiCompatibleEn
         ? { type: "json_schema", json_schema: { name: "trip_intake", strict: true, schema: tripIntakeJsonSchema } }
         : { type: "json_object" },
     }),
-    signal: AbortSignal.timeout(12_000),
+    signal,
   });
   const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }>; error?: { message?: string } };
   if (!response.ok) throw new ProviderRequestError(provider, model, response.status, payload.error?.message ?? "request failed");
@@ -157,26 +179,26 @@ function providerCandidates(): ProviderCandidate[] {
   const candidates: ProviderCandidate[] = [];
   if (process.env.OPENAI_API_KEY) {
     for (const model of configuredModels("OPENAI_MODELS", "OPENAI_MODEL", ["gpt-5.6"])) {
-      candidates.push({ provider: "openai", model, request: (prompt) => requestOpenAI(model, prompt) });
+      candidates.push({ provider: "openai", model, request: (prompt, signal) => requestOpenAI(model, prompt, signal) });
     }
   }
   if (process.env.GEMINI_API_KEY) {
     for (const model of configuredModels("GEMINI_MODELS", "GEMINI_MODEL", ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"])) {
-      candidates.push({ provider: "gemini", model, request: (prompt) => requestGemini(model, prompt) });
+      candidates.push({ provider: "gemini", model, request: (prompt, signal) => requestGemini(model, prompt, signal) });
     }
   }
   if (process.env.GROQ_API_KEY) {
     for (const model of configuredModels("GROQ_MODELS", "GROQ_MODEL", ["openai/gpt-oss-20b", "llama-3.3-70b-versatile"])) {
-      candidates.push({ provider: "groq", model, request: (prompt) => requestOpenAiCompatible("groq", model, prompt) });
+      candidates.push({ provider: "groq", model, request: (prompt, signal) => requestOpenAiCompatible("groq", model, prompt, signal) });
     }
   }
   if (process.env.MISTRAL_API_KEY) {
     for (const model of configuredModels("MISTRAL_MODELS", "MISTRAL_MODEL", ["mistral-small-latest"])) {
-      candidates.push({ provider: "mistral", model, request: (prompt) => requestOpenAiCompatible("mistral", model, prompt) });
+      candidates.push({ provider: "mistral", model, request: (prompt, signal) => requestOpenAiCompatible("mistral", model, prompt, signal) });
     }
   }
   if (process.env.OPENROUTER_API_KEY) {
-    candidates.push({ provider: "openrouter", model: "openrouter/free", request: (prompt) => requestOpenAiCompatible("openrouter", "openrouter/free", prompt) });
+    candidates.push({ provider: "openrouter", model: "openrouter/free", request: (prompt, signal) => requestOpenAiCompatible("openrouter", "openrouter/free", prompt, signal) });
   }
   return candidates;
 }
@@ -215,18 +237,24 @@ export function fallbackTripIntake(message: string, current: Partial<TripIntake>
   return { ...merged, nextQuestion, reply };
 }
 
-export async function extractTripIntake(message: string, current: Partial<TripIntake>, context = "", traceId?: string): Promise<TripIntake> {
+export async function extractTripIntakeWithMeta(message: string, current: Partial<TripIntake>, context = "", traceId?: string): Promise<TripIntakeResult> {
   const candidates = providerCandidates();
-  if (!candidates.length) return fallbackTripIntake(message, current);
+  if (!candidates.length) return { intake: fallbackTripIntake(message, current), provider: "fallback", model: "deterministic" };
 
-  const prompt = `You are RallyUp, a warm, perceptive travel concierge having a real text conversation. Do not sound like an intake form. Classify the user's objective and choose the best path: group_trip, solo_trip, destination_ideas, research, join_trip, or unknown; and planner, participant, solo, or explorer. Respond to what they just said, acknowledge the human meaning, and ask at most one natural follow-up question. Keep the conversation moving down the most useful path. Extract critical trip details silently and preserve existing fields unless the new message clearly changes them. Never invent dates, budgets, people, or constraints. Keep the reply under 240 characters, use no more than two short sentences, and do not use numbered lists, field labels, or phrases like 'I need to collect'. Return ONLY valid JSON matching this shape: {"objective":"group_trip|solo_trip|destination_ideas|research|join_trip|unknown","flowVariant":"planner|participant|solo|explorer","destination":string|null,"dates":string|null,"groupSize":number|null,"budget":string|null,"tripStyle":string|null,"hardConstraints":string[],"preferences":string[],"nextQuestion":string,"reply":string}.\n\nCurrent intake: ${JSON.stringify(current)}\nRecent conversation: ${context || "(first message)"}\nNew message: ${message}`;
+  const prompt = `You are RallyUp, a warm, perceptive travel concierge having a real text conversation. Do not sound like an intake form. Classify the user's objective and choose the best path: group_trip, solo_trip, destination_ideas, research, join_trip, or unknown; and planner, participant, solo, or explorer. Respond to what they just said, acknowledge the human meaning, and ask at most one natural follow-up question. Keep the conversation moving down the most useful path. Extract critical trip details silently and preserve existing fields unless the new message clearly changes them. Never invent dates, budgets, people, or constraints. Once destination, dates, and group size are known, stop collecting intake details and move to an action: suggest directions, create the planner workspace, or start coordinating the group. Keep the reply under 240 characters, use no more than two short sentences, and do not use numbered lists, field labels, or phrases like 'I need to collect'. Return ONLY valid JSON matching this shape: {"objective":"group_trip|solo_trip|destination_ideas|research|join_trip|unknown","flowVariant":"planner|participant|solo|explorer","destination":string|null,"dates":string|null,"groupSize":number|null,"budget":string|null,"tripStyle":string|null,"hardConstraints":string[],"preferences":string[],"nextQuestion":string,"reply":string}.\n\nCurrent intake: ${JSON.stringify(current)}\nRecent conversation: ${context || "(first message)"}\nNew message: ${message}`;
 
+  const deadline = Date.now() + totalIntakeTimeoutMs;
   for (const candidate of candidates) {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) break;
     const startedAt = Date.now();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), Math.min(providerTimeoutMs, remainingMs));
     try {
-      const parsed = tripIntakeSchema.parse(parseProviderOutput(await candidate.request(prompt)));
+      const parsed = tripIntakeSchema.parse(parseProviderOutput(await candidate.request(prompt, controller.signal)));
+      const merged = mergeTripIntake(current, parsed);
       console.info("AI intake extraction succeeded", { traceId, provider: candidate.provider, model: candidate.model, durationMs: Date.now() - startedAt });
-      return { ...parsed, reply: compactReply(parsed.reply) };
+      return { intake: { ...merged, reply: compactReply(merged.reply) }, provider: candidate.provider, model: candidate.model };
     } catch (error) {
       console.warn("AI intake provider failed; trying next candidate", {
         traceId,
@@ -236,11 +264,17 @@ export async function extractTripIntake(message: string, current: Partial<TripIn
         durationMs: Date.now() - startedAt,
         message: error instanceof Error ? error.message : String(error),
       });
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
   console.error("All AI intake providers failed; using deterministic fallback");
-  return fallbackTripIntake(message, current);
+  return { intake: fallbackTripIntake(message, current), provider: "fallback", model: "deterministic" };
+}
+
+export async function extractTripIntake(message: string, current: Partial<TripIntake>, context = "", traceId?: string): Promise<TripIntake> {
+  return (await extractTripIntakeWithMeta(message, current, context, traceId)).intake;
 }
 
 export function hasCoreTripBrief(intake: Partial<TripIntake>) {
