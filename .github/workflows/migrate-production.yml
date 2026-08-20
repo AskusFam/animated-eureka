@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - ".github/workflows/migrate-production.yml"
       - "drizzle/**"
       - "lib/db/schema.ts"
       - "drizzle.config.ts"
